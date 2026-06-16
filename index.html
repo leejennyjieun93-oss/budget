@@ -123,6 +123,18 @@
     width: 100%; background: #ffffff; border: 1px solid #d1d5db; color: #1f2328;
     border-radius: 8px; padding: 10px; font-size: 16px; font-family: inherit;
   }
+  /* iOS Safari가 type="date"에 가운데 정렬·다른 높이를 강제하는 걸 덮어쓰기 */
+  input[type="date"] {
+    -webkit-appearance: none;
+    appearance: none;
+    text-align: left;
+    min-height: 42px;          /* 다른 input과 동일 높이 */
+    line-height: 1.2;
+    display: block;
+  }
+  input[type="date"]::-webkit-date-and-time-value {
+    text-align: left;          /* iOS가 표시 텍스트만 따로 center로 잡는 것 차단 */
+  }
   textarea { resize: vertical; min-height: 40px; }
   .btn {
     width: 100%; color: #ffffff; border: none; border-radius: 8px;
