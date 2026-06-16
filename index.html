@@ -868,6 +868,66 @@
     renderAll();
   }
 
+  // ----- 가벼운 재페치 (탭 포커스 복귀 시 호출) ------------------
+  // 다른 기기에서 입력한 내용을 가져오기 위한 풀(pull).
+  // 마이그레이션 로직은 건드리지 않고 cloud → 메모리·localStorage 덮어쓰기만.
+  let lastRefreshAt = 0;
+  const REFRESH_THROTTLE_MS = 3000;
+
+  async function refreshFromCloud() {
+    if (!currentUser) return;
+    const uid = currentUser.id;
+    const [entriesRes, instRes, settingsRes] = await Promise.all([
+      sb.from('entries').select('*').is('deleted_at', null).order('date', { ascending: false }),
+      sb.from('installments').select('*').is('deleted_at', null),
+      sb.from('settings').select('*').eq('user_id', uid).maybeSingle(),
+    ]);
+    if (entriesRes.error) throw entriesRes.error;
+    if (instRes.error) throw instRes.error;
+
+    data = {};
+    for (const row of entriesRes.data) {
+      if (!data[row.date]) data[row.date] = { items: [] };
+      data[row.date].items.push(rowToItem(row));
+    }
+    saveData();
+
+    insts = instRes.data.map(rowToInst);
+    saveInsts();
+
+    if (settingsRes.data) {
+      challengeStart = settingsRes.data.challenge_start;
+      budgets = { week: settingsRes.data.budget_week, month: settingsRes.data.budget_month };
+      saveBudgets();
+      if (challengeStart) {
+        localStorage.setItem(SKEY, challengeStart);
+        const sd = document.getElementById('startDate');
+        if (sd) sd.value = challengeStart;
+      }
+    }
+
+    renderAll();
+  }
+
+  // 탭이 다시 보일 때 자동 재페치 (다른 기기 동기화 흡수)
+  document.addEventListener('visibilitychange', async () => {
+    if (document.visibilityState !== 'visible') return;
+    if (!currentUser) return;
+    // 편집 중이면 폼이 날아가지 않게 스킵
+    if (editing !== null || editingInst !== null) return;
+    // 스로틀: 3초 안에 두 번 안 돔
+    const now = nowMillis();
+    if (now - lastRefreshAt < REFRESH_THROTTLE_MS) return;
+    lastRefreshAt = now;
+    try {
+      await refreshFromCloud();
+    } catch (err) {
+      console.error('Focus refresh failed:', err);
+    }
+  });
+
+  function nowMillis() { return new Date().getTime(); }
+
   // ----- 마이그레이션 (1회) --------------------------------------
   async function migrateLocalToCloud() {
     // 1) 콘솔에 안전 백업 dump
