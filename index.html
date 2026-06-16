@@ -317,9 +317,44 @@
     background: none; border: none; color: #2563eb; font-size: 12px; cursor: pointer;
     margin-right: 8px; font-weight: 600;
   }
+
+  /* ===== 로그인 화면 ===== */
+  #auth-gate {
+    position: fixed; inset: 0; background: #ffffff; z-index: 1000;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 24px; padding-top: calc(24px + env(safe-area-inset-top));
+  }
+  #auth-gate .auth-card { max-width: 320px; width: 100%; }
+  #auth-gate h1 { font-size: 24px; margin-bottom: 6px; text-align: center; }
+  #auth-gate .auth-sub { color: #6b7280; font-size: 13px; margin-bottom: 24px; text-align: center; }
+  #auth-gate input {
+    width: 100%; padding: 12px 14px; border: 1px solid #d1d5db; border-radius: 10px;
+    margin-bottom: 8px; font-size: 14px; -webkit-appearance: none;
+  }
+  #auth-gate input:focus { outline: none; border-color: #16a34a; }
+  #auth-gate button {
+    width: 100%; padding: 12px; background: #16a34a; color: #ffffff; border: none;
+    border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; margin-top: 4px;
+  }
+  #auth-gate button:disabled { background: #9ca3af; cursor: not-allowed; }
+  #auth-error { color: #dc2626; font-size: 12px; margin-top: 12px; text-align: center; min-height: 16px; }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
+
+  <!-- 로그인 게이트 (로그인 안 되면 앱 위에 덮어씌움) -->
+  <div id="auth-gate" style="display:none">
+    <div class="auth-card">
+      <h1>🌱 무지출 가계부</h1>
+      <div class="auth-sub">로그인 후 이용할 수 있습니다.</div>
+      <input id="auth-email" type="email" placeholder="이메일" autocomplete="email" inputmode="email">
+      <input id="auth-password" type="password" placeholder="비밀번호" autocomplete="current-password">
+      <button id="auth-login-btn" type="button">로그인</button>
+      <div id="auth-error"></div>
+    </div>
+  </div>
+
   <h1>🎯 무지출 챌린지</h1>
   <div class="sub">Jenny의 무지출 가계부 · 2026.06.01 시작</div>
 
@@ -511,6 +546,12 @@
     </div>
 
     <div class="sec">
+      <h2>👤 계정</h2>
+      <div class="hint" id="account-email" style="margin-bottom:8px">—</div>
+      <button class="btn" style="background:#6b7280" onclick="handleLogout()">로그아웃</button>
+    </div>
+
+    <div class="sec">
       <h2>💾 데이터 백업</h2>
       <div class="backup-row">
         <button onclick="exportData()">⬇ 내보내기 (파일)</button>
@@ -545,6 +586,341 @@
   </div>
 
 <script>
+  // ============================================================
+  // Supabase 설정 — 본인이 채워넣을 곳 (2군데)
+  // ------------------------------------------------------------
+  // anon key는 RLS가 막아주므로 GitHub에 푸시해도 안전합니다.
+  // service_role 키는 절대 여기에 넣지 마세요.
+  // ============================================================
+  const SUPABASE_URL = 'https://gmcfidqwktuimqjsxpmg.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_ImfT_5tTlXbYk8vpfyq8Lg_Hup6K8k3';
+
+  // ===== Supabase 클라이언트 초기화 =====
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: {
+      persistSession: true,      // 세션을 localStorage에 저장 → 영구 로그인
+      autoRefreshToken: true,    // 토큰 만료 직전 자동 갱신
+      detectSessionInUrl: false  // OAuth redirect 처리 안 함 (우리는 비번 로그인만)
+    }
+  });
+
+  let currentUser = null;  // 로그인 후 유저 정보 (id, email)
+
+  // ===== 로그인 게이트 =====
+  function showAuthGate() {
+    document.getElementById('auth-gate').style.display = 'flex';
+  }
+  function hideAuthGate() {
+    document.getElementById('auth-gate').style.display = 'none';
+  }
+
+  async function handleLogin() {
+    const email = document.getElementById('auth-email').value.trim();
+    const password = document.getElementById('auth-password').value;
+    const errEl = document.getElementById('auth-error');
+    const btn = document.getElementById('auth-login-btn');
+    errEl.textContent = '';
+
+    if (!email || !password) {
+      errEl.textContent = '이메일과 비밀번호를 입력하세요.';
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = '로그인 중…';
+
+    const { data, error } = await sb.auth.signInWithPassword({ email, password });
+
+    btn.disabled = false;
+    btn.textContent = '로그인';
+
+    if (error) {
+      errEl.textContent = error.message || '로그인 실패';
+      return;
+    }
+
+    currentUser = data.user;
+    document.getElementById('auth-password').value = '';
+    onAuthed();
+  }
+
+  async function handleLogout() {
+    if (!confirm('로그아웃할까요? (이 기기의 localStorage 캐시는 그대로 유지됩니다)')) return;
+    await sb.auth.signOut();
+    currentUser = null;
+    showAuthGate();
+  }
+
+  async function onAuthed() {
+    document.getElementById('account-email').textContent = currentUser?.email || '—';
+    hideAuthGate();
+    // 클라우드에서 데이터 동기화 (실패해도 로컬로 폴백)
+    try {
+      await syncFromCloud();
+    } catch (err) {
+      console.error('Cloud sync on login failed:', err);
+      alert('클라우드 동기화 실패 — 로컬 데이터로 계속 진행합니다. (콘솔 확인)');
+    }
+  }
+
+  // 페이지 로드 시 세션 체크
+  async function bootAuth() {
+    const { data: { session } } = await sb.auth.getSession();
+    if (session) {
+      currentUser = session.user;
+      onAuthed();
+    } else {
+      showAuthGate();
+    }
+  }
+
+  // 다른 탭에서 로그아웃 등 변경 감지
+  sb.auth.onAuthStateChange((event, session) => {
+    if (event === 'SIGNED_OUT') {
+      currentUser = null;
+      showAuthGate();
+    } else if (event === 'SIGNED_IN' && session) {
+      currentUser = session.user;
+      document.getElementById('account-email').textContent = currentUser.email;
+    }
+  });
+
+  // DOM 준비된 후 로그인 폼 이벤트 바인딩 + 세션 체크
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('auth-login-btn').addEventListener('click', handleLogin);
+    document.getElementById('auth-password').addEventListener('keydown', e => {
+      if (e.key === 'Enter') handleLogin();
+    });
+    document.getElementById('auth-email').addEventListener('keydown', e => {
+      if (e.key === 'Enter') document.getElementById('auth-password').focus();
+    });
+    bootAuth();
+  });
+
+  // ============================================================
+  // 클라우드 동기화 레이어
+  // ------------------------------------------------------------
+  // 패턴: 로컬 먼저 저장 → cloud는 fire-and-forget
+  // cloud 실패해도 앱은 계속 동작, 콘솔에 에러 로그만 남김.
+  // ============================================================
+  const MIG_FLAG_PREFIX = 'supabase_migrated_';
+  function newId() { return crypto.randomUUID(); }
+  function nowIso() { return new Date().toISOString(); }
+
+  // 메모리 item ↔ DB row 매핑
+  function itemToRow(item, date) {
+    return {
+      id: item.id,
+      user_id: currentUser.id,
+      date: date,
+      amount: item.amount,
+      paid: item.paid,
+      memo: item.memo,
+      cat: item.cat,
+      type: item.type,
+      dumb: !!item.dumb,
+      deleted_at: null,
+    };
+  }
+  function rowToItem(row) {
+    return {
+      id: row.id,
+      amount: row.amount,
+      paid: row.paid,
+      memo: row.memo || '',
+      cat: row.cat || '기타',
+      type: row.type || 'spend',
+      dumb: !!row.dumb,
+    };
+  }
+  function instToRow(inst) {
+    return {
+      id: inst.id,
+      user_id: currentUser.id,
+      name: inst.name,
+      principal: inst.principal,
+      months: inst.months,
+      monthly: inst.monthly,
+      start_ym: inst.start,
+      deleted_at: null,
+    };
+  }
+  function rowToInst(row) {
+    return {
+      id: row.id,
+      name: row.name,
+      principal: row.principal,
+      months: row.months,
+      monthly: row.monthly,
+      start: row.start_ym,
+    };
+  }
+
+  // fire-and-forget: cloud 호출 결과를 await하지 않고 에러만 로깅
+  function cloudFAF(promise, label) {
+    Promise.resolve(promise)
+      .then(res => { if (res?.error) console.error('[cloud ' + label + ']', res.error); })
+      .catch(err => console.error('[cloud ' + label + '] threw:', err));
+  }
+
+  // ----- CRUD 헬퍼 ----------------------------------------------
+  function cloudUpsertEntry(item, date) {
+    if (!currentUser) return;
+    cloudFAF(sb.from('entries').upsert(itemToRow(item, date)), 'upsert entry');
+  }
+  function cloudSoftDeleteEntry(id) {
+    if (!currentUser || !id) return;
+    cloudFAF(sb.from('entries').update({ deleted_at: nowIso() }).eq('id', id), 'soft-delete entry');
+  }
+  function cloudUpsertInst(inst) {
+    if (!currentUser) return;
+    cloudFAF(sb.from('installments').upsert(instToRow(inst)), 'upsert inst');
+  }
+  function cloudSoftDeleteInst(id) {
+    if (!currentUser || !id) return;
+    cloudFAF(sb.from('installments').update({ deleted_at: nowIso() }).eq('id', id), 'soft-delete inst');
+  }
+  function cloudUpsertSettings() {
+    if (!currentUser) return;
+    cloudFAF(sb.from('settings').upsert({
+      user_id: currentUser.id,
+      challenge_start: challengeStart || null,
+      budget_week: budgets.week,
+      budget_month: budgets.month,
+    }), 'upsert settings');
+  }
+
+  // ----- 초기 로드 (로그인 직후) --------------------------------
+  async function syncFromCloud() {
+    const uid = currentUser.id;
+    const [entriesRes, instRes, settingsRes] = await Promise.all([
+      sb.from('entries').select('*').is('deleted_at', null).order('date', { ascending: false }),
+      sb.from('installments').select('*').is('deleted_at', null),
+      sb.from('settings').select('*').eq('user_id', uid).maybeSingle(),
+    ]);
+    if (entriesRes.error) throw entriesRes.error;
+    if (instRes.error) throw instRes.error;
+    if (settingsRes.error && settingsRes.error.code !== 'PGRST116') throw settingsRes.error;
+
+    const cloudIsEmpty =
+      entriesRes.data.length === 0 &&
+      instRes.data.length === 0 &&
+      !settingsRes.data;
+
+    const localHasData =
+      Object.keys(data).length > 0 ||
+      (insts && insts.length > 0);
+
+    const migFlag = MIG_FLAG_PREFIX + uid;
+    const alreadyMigrated = localStorage.getItem(migFlag) === '1';
+
+    if (cloudIsEmpty && localHasData && !alreadyMigrated) {
+      // 마이그레이션 분기
+      const ok = confirm(
+        '이 기기의 기존 기록을 클라우드에 업로드할까요?\n\n' +
+        '· 처음 1회만 실행됩니다\n' +
+        '· 업로드 전 콘솔(F12)에 백업 JSON이 출력돼요\n' +
+        '· 취소하면 cloud는 빈 상태로 시작 (로컬 기록은 그대로 유지)'
+      );
+      if (ok) {
+        await migrateLocalToCloud();
+        localStorage.setItem(migFlag, '1');
+        alert('☁️ 클라우드 업로드 완료! 이제 다른 기기에서도 같은 이메일로 로그인하면 자동 동기화됩니다.');
+      } else {
+        // cloud는 empty 그대로 두고 마이그레이션 플래그 안 세움 → 다음 로그인 때 다시 물음
+        renderAll();
+      }
+      return;
+    }
+
+    // cloud에 데이터 있음 → cloud로 메모리·localStorage 덮어쓰기
+    data = {};
+    for (const row of entriesRes.data) {
+      if (!data[row.date]) data[row.date] = { items: [] };
+      data[row.date].items.push(rowToItem(row));
+    }
+    saveData();
+
+    insts = instRes.data.map(rowToInst);
+    if (insts.length === 0) {
+      // cloud에도 로컬에도 할부 없으면 기본값(노트북) 안 깔고 빈 배열로 둠
+    }
+    saveInsts();
+
+    if (settingsRes.data) {
+      challengeStart = settingsRes.data.challenge_start;
+      budgets = {
+        week: settingsRes.data.budget_week,
+        month: settingsRes.data.budget_month,
+      };
+      saveBudgets();
+      if (challengeStart) {
+        localStorage.setItem(SKEY, challengeStart);
+        const sd = document.getElementById('startDate');
+        if (sd) sd.value = challengeStart;
+      }
+    }
+
+    // cloud가 비어있고 로컬도 비어있고 마이그된 적 있는 경우 → 그대로 진행
+    // (다른 기기에서 다 지웠을 수도 있음)
+    localStorage.setItem(migFlag, '1');
+
+    renderAll();
+  }
+
+  // ----- 마이그레이션 (1회) --------------------------------------
+  async function migrateLocalToCloud() {
+    // 1) 콘솔에 안전 백업 dump
+    const snapshot = {
+      timestamp: nowIso(),
+      data, insts, challengeStart, budgets,
+    };
+    console.log('===== 마이그레이션 직전 스냅샷 (복사해두면 안전) =====');
+    console.log(JSON.stringify(snapshot, null, 2));
+    console.log('=====================================================');
+
+    // 2) entries에 id 부여하면서 row 배열 만들기
+    const entryRows = [];
+    for (const date in data) {
+      for (const item of data[date].items) {
+        if (!item.id) item.id = newId();
+        entryRows.push(itemToRow(item, date));
+      }
+    }
+
+    // 3) installments에 id 부여
+    const instRows = [];
+    for (const inst of insts) {
+      if (!inst.id) inst.id = newId();
+      instRows.push(instToRow(inst));
+    }
+
+    // 4) 일괄 INSERT
+    if (entryRows.length > 0) {
+      const { error } = await sb.from('entries').insert(entryRows);
+      if (error) throw error;
+    }
+    if (instRows.length > 0) {
+      const { error } = await sb.from('installments').insert(instRows);
+      if (error) throw error;
+    }
+    // settings
+    const { error: sErr } = await sb.from('settings').upsert({
+      user_id: currentUser.id,
+      challenge_start: challengeStart || null,
+      budget_week: budgets.week,
+      budget_month: budgets.month,
+    });
+    if (sErr) throw sErr;
+
+    // 5) id 부여된 상태를 localStorage에도 반영
+    saveData(); saveInsts();
+    renderAll();
+  }
+
+  // ============================================================
+  // 기존 앱 로직 (그대로 유지)
+  // ============================================================
   const KEY = 'noSpendLog';
   const IKEY = 'installments';
   const SKEY = 'challengeStart';
@@ -567,6 +943,7 @@
     const v = raw[d];
     if (Array.isArray(v.items)) {
       data[d] = { items: v.items.map(i => ({
+        id: i.id,
         amount: i.amount, memo: i.memo || '', cat: i.cat || '기타',
         dumb: !!i.dumb, paid: i.paid || null, type: i.type || 'spend'
       })) };
@@ -628,6 +1005,7 @@
     if (!v) return;
     challengeStart = v;
     localStorage.setItem(SKEY, v);
+    cloudUpsertSettings();
     renderAll();
   }
 
@@ -717,9 +1095,11 @@
     if (!date) { alert('날짜를 선택하세요'); return; }
     const item = buildItem();
     if (!item) return;
+    item.id = newId();
     if (!data[date]) data[date] = { items: [] };
     data[date].items.push(item);
     saveData();
+    cloudUpsertEntry(item, date);
     resetForm();
     renderAll();
   }
@@ -779,11 +1159,14 @@
     if (!date) { alert('날짜를 선택하세요'); return; }
     const item = buildItem();
     if (!item) return;
+    const oldItem = data[editing.date].items[editing.idx];
+    item.id = oldItem.id || newId();  // 기존 id 유지, 없으면 새로 부여
     data[editing.date].items.splice(editing.idx, 1);
     if (!data[editing.date].items.length) delete data[editing.date];
     if (!data[date]) data[date] = { items: [] };
     data[date].items.push(item);
     saveData();
+    cloudUpsertEntry(item, date);
     resetForm();
     renderAll();
   }
@@ -802,9 +1185,11 @@
       if (editDelTimer) clearTimeout(editDelTimer);
       editDelPending = false;
       const { date, idx } = editing;
+      const removed = data[date].items[idx];
       data[date].items.splice(idx, 1);
       if (!data[date].items.length) delete data[date];
       saveData();
+      if (removed?.id) cloudSoftDeleteEntry(removed.id);
       resetForm();
       renderAll();
       return;
@@ -828,9 +1213,12 @@
       // 두 번째 탭 → 실제 삭제
       clearTimeout(pendingTimer);
       pendingDel = null;
+      const removed = data[date].items[idx];
       data[date].items.splice(idx, 1);
       if (!data[date].items.length) delete data[date];
-      saveData(); renderAll();
+      saveData();
+      if (removed?.id) cloudSoftDeleteEntry(removed.id);
+      renderAll();
       return;
     }
     // 첫 번째 탭 → 확인 대기 상태
@@ -921,6 +1309,7 @@
     if (!w || w <= 0 || !m || m <= 0) { alert('예산을 올바르게 입력하세요'); return; }
     budgets = { week: w, month: m };
     saveBudgets();
+    cloudUpsertSettings();
     renderBudget();
     alert('예산이 저장됐어요!');
   }
@@ -1123,8 +1512,10 @@
   function addInst() {
     const item = readInstForm();
     if (!item) return;
+    item.id = newId();
     insts.push(item);
     saveInsts();
+    cloudUpsertInst(item);
     clearInstForm();
     document.getElementById('instDetails').open = false;
     renderInsts();
@@ -1153,8 +1544,10 @@
     if (editingInst === null) return;
     const item = readInstForm();
     if (!item) return;
+    item.id = insts[editingInst]?.id || newId();
     insts[editingInst] = item;
     saveInsts();
+    cloudUpsertInst(item);
     clearInstForm();
     document.getElementById('instDetails').open = false;
     renderInsts();
@@ -1171,9 +1564,12 @@
     if (pendingDelInst === i) {
       clearTimeout(pendingInstTimer);
       pendingDelInst = null;
+      const removed = insts[i];
       insts.splice(i, 1);
       if (editingInst === i) clearInstForm();
-      saveInsts(); renderInsts();
+      saveInsts();
+      if (removed?.id) cloudSoftDeleteInst(removed.id);
+      renderInsts();
       return;
     }
     pendingDelInst = i;
