@@ -1857,7 +1857,9 @@
     const dumbs = months.map(ym => monthDumbTotal(ym).sum);
     const zeroCnts = months.map(ym => countZeroDays(ym));
 
-    const W = 560, H = 250, padL = 20, padB = 44, padT = 16, padR = 10;
+    // padT=50: 위쪽에 범례 전용 공간 확보 (막대 위 금액 라벨이 범례와 안 겹치게)
+    // padB=58: 아래 '월' + '무지출 N일' 라벨 들어갈 공간
+    const W = 560, H = 300, padL = 24, padB = 58, padT = 50, padR = 14;
     const cw = (W - padL - padR) / months.length;
     const maxV = Math.max(...nets, 1);
 
@@ -1872,19 +1874,20 @@
       const isCur = i === months.length - 1;
       bars += `<rect x="${x}" y="${y}" width="${cw*0.64}" height="${Math.max(bh,1)}" rx="4" fill="${isCur?'#2563eb':'#bfdbfe'}"/>`;
       if (dv > 0) bars += `<rect x="${x}" y="${H-padB-dh}" width="${cw*0.64}" height="${Math.max(dh,1)}" rx="4" fill="#fb923c"/>`;
-      if (nets[i] !== 0) bars += `<text x="${x+cw*0.32}" y="${y-5}" text-anchor="middle" font-size="10" fill="#6b7280">${Math.round(nets[i]/10000)}만</text>`;
+      if (nets[i] !== 0) bars += `<text x="${x+cw*0.32}" y="${y-8}" text-anchor="middle" font-size="14" font-weight="600" fill="#374151">${Math.round(nets[i]/10000)}만</text>`;
       const [yy, mm] = ym.split('-');
-      labels += `<text x="${x+cw*0.32}" y="${H-padB+16}" text-anchor="middle" font-size="11" fill="#6b7280">${Number(mm)}월</text>`;
-      zlabels += `<text x="${x+cw*0.32}" y="${H-padB+30}" text-anchor="middle" font-size="9" fill="#16a34a">무지출 ${zeroCnts[i]}일</text>`;
+      labels += `<text x="${x+cw*0.32}" y="${H-padB+20}" text-anchor="middle" font-size="14" font-weight="600" fill="#374151">${Number(mm)}월</text>`;
+      zlabels += `<text x="${x+cw*0.32}" y="${H-padB+38}" text-anchor="middle" font-size="12" fill="#16a34a">무지출 ${zeroCnts[i]}일</text>`;
     });
 
+    // 범례: 위쪽 padT 영역에 가로로, 충분한 간격으로
     el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">
       <line x1="${padL}" y1="${H-padB}" x2="${W-padR}" y2="${H-padB}" stroke="#e5e7eb"/>
       ${bars}${labels}${zlabels}
-      <rect x="${W-160}" y="2" width="10" height="10" rx="2" fill="#bfdbfe"/>
-      <text x="${W-146}" y="11" font-size="10" fill="#6b7280">순지출</text>
-      <rect x="${W-80}" y="2" width="10" height="10" rx="2" fill="#fb923c"/>
-      <text x="${W-66}" y="11" font-size="10" fill="#6b7280">멍청소비</text>
+      <rect x="${W-220}" y="14" width="16" height="16" rx="3" fill="#bfdbfe"/>
+      <text x="${W-198}" y="27" font-size="14" fill="#374151">순지출</text>
+      <rect x="${W-120}" y="14" width="16" height="16" rx="3" fill="#fb923c"/>
+      <text x="${W-98}" y="27" font-size="14" fill="#374151">멍청소비</text>
     </svg>`;
   }
 
