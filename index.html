@@ -544,6 +544,12 @@
     </div>
 
     <div class="sec">
+      <h2>📌 이 달 고정비 카테고리별</h2>
+      <div id="fixedCatChart"></div>
+      <div class="hint" style="margin-top:8px">고정비는 무지출 판정·예산·멍청소비 계산에서 제외돼요. 여기에선 구성만 보여드림.</div>
+    </div>
+
+    <div class="sec">
       <h2>📈 월별 순지출 추이 (최근 6개월)</h2>
       <div id="trendChart"></div>
     </div>
@@ -1003,7 +1009,8 @@
   const SPEND_CATS = ['식비', '카페/간식', '교통', '쇼핑', '의료', '운동', '여가/문화', '구독료', '기타'];
   const SPEND_COLORS = ['#f59e0b','#f97316','#2563eb','#7c3aed','#059669','#0d9488','#e11d48','#0ea5e9','#6b7280'];
   const INCOME_CATS = ['실비환급', '정산', '용돈', '환불', '기타수입'];
-  const FIXED_CATS = ['통신비', '구독', '보험', '공과금', '월세/관리비', '기타고정'];
+  const FIXED_CATS = ['통신비', '구독', '보험', '공과금', '월세/관리비', '대출이자', '기타고정'];
+  const FIXED_COLORS = ['#2563eb','#7c3aed','#16a34a','#0d9488','#f97316','#dc2626','#6b7280'];
   let mode = 'spend'; // spend | fixed | income
   let selectedCat = '식비';
   let isDumb = false;
@@ -1757,6 +1764,7 @@
     renderDumbReport(ym);
     renderCalendar(ym);
     renderCatChart(ym);
+    renderFixedCatChart(ym);
     renderTrend();
     renderSummary(ym);
   }
@@ -1840,6 +1848,28 @@
     el.innerHTML = entries.map(([cat, v]) => {
       const ci = SPEND_CATS.indexOf(cat);
       const color = SPEND_COLORS[ci >= 0 ? ci : SPEND_CATS.length-1];
+      const pct = Math.round(v/totalSum*100);
+      return `<div class="catbar">
+        <div class="row1"><span class="nm">${cat}</span><span class="vl">${fmt(v)}원 · ${pct}%</span></div>
+        <div class="track"><div class="fill" style="width:${Math.max(3, v/max*100)}%; background:${color}"></div></div>
+      </div>`;
+    }).join('');
+  }
+
+  function renderFixedCatChart(ym) {
+    const el = document.getElementById('fixedCatChart');
+    const sums = {};
+    for (const d in data) {
+      if (!d.startsWith(ym)) continue;
+      for (const it of fixedItems(data[d])) sums[it.cat] = (sums[it.cat]||0) + it.amount;
+    }
+    const entries = Object.entries(sums).sort((a,b) => b[1]-a[1]);
+    if (!entries.length) { el.innerHTML = '<div class="empty">이 달 고정비 기록이 없어요</div>'; return; }
+    const max = entries[0][1];
+    const totalSum = entries.reduce((s,e)=>s+e[1],0);
+    el.innerHTML = entries.map(([cat, v]) => {
+      const ci = FIXED_CATS.indexOf(cat);
+      const color = FIXED_COLORS[ci >= 0 ? ci : FIXED_CATS.length-1];
       const pct = Math.round(v/totalSum*100);
       return `<div class="catbar">
         <div class="row1"><span class="nm">${cat}</span><span class="vl">${fmt(v)}원 · ${pct}%</span></div>
