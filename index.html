@@ -83,6 +83,65 @@
   .page { display: none; }
   .page.active { display: block; }
 
+  /* ===== Hero (shared across record/inst/stats tabs) ===== */
+  .hero {
+    background: var(--hero);
+    color: #fff;
+    border-radius: 0 0 24px 24px;
+    margin: -16px -16px 22px;
+    margin-top: calc(-16px - env(safe-area-inset-top));
+    padding: 22px 22px 24px;
+    padding-top: calc(24px + env(safe-area-inset-top));
+  }
+  .hero-top {
+    display: flex; justify-content: flex-end; align-items: center; margin-bottom: 20px;
+    font-size: 13px; color: rgba(255,255,255,0.6);
+  }
+  .hero-body { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  .hero-left { flex: 1; min-width: 0; }
+  .hero-kicker {
+    font-size: 11.5px; letter-spacing: 0.13em; text-transform: uppercase;
+    color: rgba(255,255,255,0.55); font-weight: 700; margin-bottom: 12px;
+  }
+  .hero-amt { display: flex; align-items: baseline; gap: 4px; }
+  .hero-amt .won { font-size: 18px; font-weight: 600; color: rgba(255,255,255,0.7); }
+  .hero-amt .num {
+    font-size: 38px; line-height: 0.95; font-weight: 800; color: #fff;
+    letter-spacing: -0.02em; font-variant-numeric: tabular-nums;
+  }
+  .hero-sub { font-size: 12.5px; color: rgba(255,255,255,0.55); margin-top: 12px; line-height: 1.5; }
+  .hero-sub b { color: var(--gold); font-weight: 700; }
+  .hero-donut { position: relative; width: 92px; height: 92px; flex: none; }
+  .hero-donut svg { width: 92px; height: 92px; display: block; }
+  .hero-donut .donut-text {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+  }
+  .hero-donut .pct { font-size: 22px; font-weight: 800; color: #fff; line-height: 1; }
+  .hero-donut .pct small { font-size: 12px; font-weight: 600; }
+  .hero-donut .lbl { font-size: 9.5px; color: rgba(255,255,255,0.55); margin-top: 2px; font-weight: 500; }
+
+  /* ===== Streak pill (record tab) ===== */
+  .streak-pill {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--hero); color: #fff; border-radius: 999px;
+    padding: 9px 16px; margin-bottom: 18px;
+    font-size: 13px; font-weight: 600;
+  }
+  .streak-pill .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--gold); flex: none; }
+  .streak-pill.empty { background: var(--card); color: var(--muted); border: 1px solid var(--hairline); }
+  .streak-pill.empty .dot { background: var(--faint-2); }
+
+  /* ===== KPI tiles (record tab — replaces old 3-tile stats) ===== */
+  .kpis { display: flex; gap: 12px; margin-bottom: 18px; }
+  .kpi {
+    flex: 1; background: var(--card); border: 1px solid var(--hairline); border-radius: var(--r-lg);
+    padding: 14px 16px;
+  }
+  .kpi .num { font-size: 24px; font-weight: 800; color: var(--ink); letter-spacing: -0.01em; }
+  .kpi .num .unit { font-size: 13px; color: var(--faint); font-weight: 600; margin-left: 1px; }
+  .kpi .lbl { font-size: 12px; color: var(--muted); margin-top: 4px; font-weight: 500; }
+
   /* ===== Mode toggle (spend/fixed/income) ===== */
   .mode-row { display: flex; gap: 6px; margin-bottom: 16px; }
   .mode-btn {
@@ -438,10 +497,39 @@
 
   <!-- 기록 페이지 -->
   <div class="page active" id="page-record">
-    <div class="stats">
-      <div class="stat streak"><div class="num" id="streak">0</div><div class="lbl">연속 무지출</div></div>
-      <div class="stat rate"><div class="num" id="rate">0%</div><div class="lbl">이번 달 달성률</div></div>
-      <div class="stat total"><div class="num" id="total">0</div><div class="lbl">이번 달 순지출(원)</div></div>
+
+    <!-- Hero -->
+    <div class="hero">
+      <div class="hero-top"><span id="heroContext">—</span></div>
+      <div class="hero-body">
+        <div class="hero-left">
+          <div class="hero-kicker">이번 달 순지출</div>
+          <div class="hero-amt"><span class="won">₩</span><span class="num" id="heroNet">0</span></div>
+          <div class="hero-sub">월 예산의 <b id="heroBudgetPct">0%</b> 사용</div>
+        </div>
+        <div class="hero-donut">
+          <svg viewBox="0 0 96 96">
+            <circle cx="48" cy="48" r="38" fill="none" stroke="rgba(255,255,255,0.16)" stroke-width="8"/>
+            <circle id="heroDonutArc" cx="48" cy="48" r="38" fill="none" stroke="#D9B36A" stroke-width="8" stroke-linecap="round" stroke-dasharray="238.8" stroke-dashoffset="238.8" transform="rotate(-90 48 48)"/>
+          </svg>
+          <div class="donut-text">
+            <span class="pct" id="heroDonutPct">0<small>%</small></span>
+            <span class="lbl">달성률</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Streak pill -->
+    <div class="streak-pill" id="streakPill">
+      <span class="dot"></span>
+      <span id="streakText">시작 준비</span>
+    </div>
+
+    <!-- KPI tiles -->
+    <div class="kpis">
+      <div class="kpi"><div class="num"><span id="kpiCount">0</span><span class="unit">건</span></div><div class="lbl">이번 달 기록</div></div>
+      <div class="kpi"><div class="num"><span id="kpiZero">0</span><span class="unit">일</span></div><div class="lbl">이번 달 무지출일</div></div>
     </div>
 
     <div class="auto-hint">✅ 지출 기록이 없는 날은 자동 무지출! 수입(실비 환급 등)은 무지출 판정에 영향 없이 순지출에서 차감돼요.</div>
@@ -1503,9 +1591,37 @@
     const rate = daysCount ? Math.round(zeroDays / daysCount * 100) : 0;
     const net = monthSpend + monthFixed - monthIncome;
 
-    document.getElementById('streak').textContent = streak;
-    document.getElementById('rate').textContent = rate + '%';
-    document.getElementById('total').textContent = fmt(net);
+    // ===== 히어로 + 스트릭 + KPI (Phase 2 새 디자인) =====
+    document.getElementById('heroNet').textContent = fmt(net);
+
+    const monthBudgetVal = budgets.month || 0;
+    const budgetPctNum = monthBudgetVal > 0 ? Math.max(0, net) / monthBudgetVal * 100 : 0;
+    document.getElementById('heroBudgetPct').textContent = budgetPctNum.toFixed(1) + '%';
+
+    const donutOffset = 238.8 * (1 - rate / 100);
+    document.getElementById('heroDonutArc').setAttribute('stroke-dashoffset', donutOffset.toFixed(1));
+    document.getElementById('heroDonutPct').innerHTML = rate + '<small>%</small>';
+
+    const [_y, _m] = ym.split('-');
+    document.getElementById('heroContext').textContent = _y + '년 ' + Number(_m) + '월';
+
+    const streakPill = document.getElementById('streakPill');
+    const streakTextEl = document.getElementById('streakText');
+    if (streak > 0) {
+      streakPill.classList.remove('empty');
+      streakTextEl.textContent = streak + '일 연속 무지출 달성 중';
+    } else {
+      streakPill.classList.add('empty');
+      streakTextEl.textContent = '아직 무지출 연속 기록 없음';
+    }
+
+    let recCount = 0;
+    for (const d in data) {
+      if (!d.startsWith(ym)) continue;
+      recCount += (data[d].items || []).length;
+    }
+    document.getElementById('kpiCount').textContent = recCount;
+    document.getElementById('kpiZero').textContent = zeroDays;
 
     const allDates = Object.keys(data).sort().reverse();
     const list = document.getElementById('list');
