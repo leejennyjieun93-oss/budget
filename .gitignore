@@ -1,3 +1,5 @@
 .DS_Store
 *.json
 backup_*
+index_backup.html
+index_backup_*.html
