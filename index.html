@@ -55,7 +55,7 @@
 
 <script type="text/babel" data-presets="react">
 const { useState, useRef, useEffect } = React;
-const APP_BUILD = 'v2026-06-20-kbfix';
+const APP_BUILD = 'v2026-06-20-no941';
 
 // ───────── inline initial data (mirrors initial_data.json) ─────────
 const INITIAL_DATA = {
@@ -242,13 +242,10 @@ function Hero({ hero, onSettings }) {
   const donutOffset = (C * (1 - hero.dPct/100)).toFixed(1);
   return (
     <div style={{ background:'#233A2E', padding:'max(20px, calc(env(safe-area-inset-top) + 16px)) 26px 28px', borderRadius:'0 0 28px 28px' }}>
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:24 }}>
-        <span style={{ fontSize:15, fontWeight:700, color:'#fff' }}>9:41</span>
-        <div style={{ display:'flex', alignItems:'center', gap:14 }}>
-          <span style={{ fontSize:13, color:'rgba(255,255,255,0.6)' }}>{hero.context}</span>
-          <div onClick={onSettings} style={{ cursor:'pointer', width:30, height:30, borderRadius:'50%', background:'rgba(255,255,255,0.12)', display:'flex', alignItems:'center', justifyContent:'center' }}>
-            <Cog />
-          </div>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'flex-end', gap:14, marginBottom:24 }}>
+        <span style={{ fontSize:13, color:'rgba(255,255,255,0.6)' }}>{hero.context}</span>
+        <div onClick={onSettings} style={{ cursor:'pointer', width:30, height:30, borderRadius:'50%', background:'rgba(255,255,255,0.12)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+          <Cog />
         </div>
       </div>
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
