@@ -55,7 +55,7 @@
 
 <script type="text/babel" data-presets="react">
 const { useState, useRef, useEffect } = React;
-const APP_BUILD = 'v2026-06-20-twodonut';
+const APP_BUILD = 'v2026-06-20-statslabel';
 
 // ───────── inline initial data (mirrors initial_data.json) ─────────
 const INITIAL_DATA = {
@@ -808,7 +808,7 @@ function App() {
   } else if (tab === 'stats') {
     hero = { context:`통계 · ${yy}.${pad2(mm)}`, kicker:'이번 달 순지출', number: fmt(monthNet),
       subPre:'총지출 ', subAccent: fmt(totalSpend)+'원', subPost:' · 수입 +'+fmt(totalIncome),
-      dPct: achievePct, dLabel:'달성률' };
+      dPct: achievePct, dLabel:'무지출 달성률' };
   } else {
     const remaining = BUDGET - monthNet;
     const over = remaining < 0;
