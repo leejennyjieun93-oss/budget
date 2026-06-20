@@ -2,40 +2,33 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#233A2E">
 <title>무지출 가계부</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
 <style>
   * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; }
+  html { background: #233A2E; }
   body {
-    margin: 0;
-    background: #d9d6cf;
+    background: #F6F4EF;
     font-family: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, sans-serif;
     font-variant-numeric: tabular-nums;
     -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior-y: none;
   }
   input, textarea { font-family: inherit; }
   .app-scroll::-webkit-scrollbar { width: 0; }
   .app-scroll { scrollbar-width: none; }
-  .phone-wrap {
-    min-height: 100vh;
-    display: flex;
-    align-items: flex-start;
-    justify-content: center;
-    padding: 40px 20px;
-    background: #d9d6cf;
-  }
-  .phone {
+  .app {
     position: relative;
-    width: 412px;
-    height: 880px;
-    border-radius: 46px;
+    width: 100%;
+    min-height: 100vh;
+    min-height: 100dvh;
     background: #F6F4EF;
-    box-shadow: 0 24px 70px rgba(40,36,28,0.28);
-    border: 1px solid rgba(0,0,0,0.05);
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
   }
 </style>
 <script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
@@ -233,7 +226,7 @@ function Hero({ hero, onSettings }) {
   const C = 238.8;
   const donutOffset = (C * (1 - hero.dPct/100)).toFixed(1);
   return (
-    <div style={{ background:'#233A2E', padding:'44px 26px 28px', borderRadius:'0 0 28px 28px' }}>
+    <div style={{ background:'#233A2E', padding:'max(20px, calc(env(safe-area-inset-top) + 16px)) 26px 28px', borderRadius:'0 0 28px 28px' }}>
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:24 }}>
         <span style={{ fontSize:15, fontWeight:700, color:'#fff' }}>9:41</span>
         <div style={{ display:'flex', alignItems:'center', gap:14 }}>
@@ -282,7 +275,7 @@ function BottomNav({ tab, setTab }) {
     );
   };
   return (
-    <div style={{ flex:'none', height:80, background:'#fff', borderTop:'1px solid #EFEBE1', display:'flex', paddingBottom:16, position:'relative', zIndex:5 }}>
+    <div style={{ background:'#fff', borderTop:'1px solid #EFEBE1', display:'flex', padding:'10px 0 calc(env(safe-area-inset-bottom) + 10px)', position:'fixed', left:0, right:0, bottom:0, zIndex:5 }}>
       {item('record', '기록', ListIcon)}
       {item('installment', '할부', CardIcon)}
       {item('stats', '통계', ChartIcon)}
@@ -765,12 +758,11 @@ function App() {
   const isIncome = seg === 'income';
 
   return (
-    <div className="phone-wrap">
-      <div className="phone">
+    <div className="app">
 
         {/* ============ RECORD TAB ============ */}
         {tab === 'record' && (
-          <div className="app-scroll" style={{ flex:1, overflowY:'auto', minHeight:0 }}>
+          <div className="app-scroll" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 80px)' }}>
             <Hero hero={hero} onSettings={() => setSheet('settings')} />
             <div style={{ padding:'20px 22px 0' }}>
               {/* streak pill */}
@@ -850,7 +842,7 @@ function App() {
 
         {/* ============ INSTALLMENT TAB ============ */}
         {tab === 'installment' && (
-          <div className="app-scroll" style={{ flex:1, overflowY:'auto', minHeight:0 }}>
+          <div className="app-scroll" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 80px)' }}>
             <Hero hero={hero} onSettings={() => setSheet('settings')} />
             <div style={{ padding:'22px 22px 0' }}>
               <div style={{ fontSize:12, lineHeight:1.5, color:'#a39d92', marginBottom:16 }}>할부는 무지출 판정·예산·멍청소비 계산에서 제외돼요.</div>
@@ -880,7 +872,7 @@ function App() {
 
         {/* ============ STATS TAB ============ */}
         {tab === 'stats' && (
-          <div className="app-scroll" style={{ flex:1, overflowY:'auto', minHeight:0 }}>
+          <div className="app-scroll" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 80px)' }}>
             <Hero hero={hero} onSettings={() => setSheet('settings')} />
             <div style={{ padding:'22px 22px 0' }}>
               <div style={{ display:'flex', gap:12, marginBottom:16 }}>
@@ -1009,7 +1001,7 @@ function App() {
 
         {/* FAB */}
         {tab === 'record' && (
-          <div onClick={() => setSheet('input')} style={{ cursor:'pointer', position:'absolute', right:22, bottom:96, width:58, height:58, borderRadius:'50%', background:'#233A2E', boxShadow:'0 8px 24px rgba(35,58,46,0.4)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:8 }}>
+          <div onClick={() => setSheet('input')} style={{ cursor:'pointer', position:'fixed', right:22, bottom:'calc(env(safe-area-inset-bottom) + 88px)', width:58, height:58, borderRadius:'50%', background:'#233A2E', boxShadow:'0 8px 24px rgba(35,58,46,0.4)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:8 }}>
             <PlusIcon />
           </div>
         )}
@@ -1017,8 +1009,8 @@ function App() {
         {/* ============ INPUT SHEET ============ */}
         {sheet === 'input' && (
           <>
-            <div onClick={closeSheet} style={{ position:'absolute', inset:0, background:'rgba(20,18,14,0.4)', zIndex:20 }}></div>
-            <div style={{ position:'absolute', left:0, right:0, bottom:0, background:'#F6F4EF', borderRadius:'26px 26px 0 0', zIndex:21, maxHeight:'94%', display:'flex', flexDirection:'column' }}>
+            <div onClick={closeSheet} style={{ position:'fixed', inset:0, background:'rgba(20,18,14,0.4)', zIndex:20 }}></div>
+            <div style={{ position:'fixed', left:0, right:0, bottom:0, background:'#F6F4EF', borderRadius:'26px 26px 0 0', zIndex:21, maxHeight:'94%', display:'flex', flexDirection:'column' }}>
               <div style={{ padding:'16px 22px 0', flex:'none' }}>
                 <div style={{ width:40, height:4, borderRadius:2, background:'#d8d2c5', margin:'0 auto 16px' }}></div>
                 <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:18 }}>
@@ -1102,12 +1094,12 @@ function App() {
                   ))}
                 </div>
                 {editingId ? (
-                  <div style={{ display:'flex', gap:8, marginBottom:18 }}>
+                  <div style={{ display:'flex', gap:8, marginBottom:'calc(env(safe-area-inset-bottom) + 18px)' }}>
                     <div onClick={onDelete} style={{ cursor:'pointer', flex:'0 0 38%', background:'#fff', color:'#C9817A', textAlign:'center', padding:16, borderRadius:15, fontSize:16, fontWeight:700, border:'1px solid #E6E1D6' }}>삭제</div>
                     <div onClick={onSave} style={{ cursor:'pointer', flex:1, background:'#233A2E', color:'#fff', textAlign:'center', padding:16, borderRadius:15, fontSize:16, fontWeight:700 }}>저장</div>
                   </div>
                 ) : (
-                  <div onClick={onSave} style={{ cursor:'pointer', background:'#233A2E', color:'#fff', textAlign:'center', padding:16, borderRadius:15, fontSize:16, fontWeight:700, marginBottom:18 }}>저장</div>
+                  <div onClick={onSave} style={{ cursor:'pointer', background:'#233A2E', color:'#fff', textAlign:'center', padding:16, borderRadius:15, fontSize:16, fontWeight:700, marginBottom:'calc(env(safe-area-inset-bottom) + 18px)' }}>저장</div>
                 )}
               </div>
             </div>
@@ -1117,8 +1109,8 @@ function App() {
         {/* ============ INSTALLMENT SHEET ============ */}
         {sheet === 'installment' && (
           <>
-            <div onClick={closeSheet} style={{ position:'absolute', inset:0, background:'rgba(20,18,14,0.4)', zIndex:20 }}></div>
-            <div className="app-scroll" style={{ position:'absolute', left:0, right:0, bottom:0, background:'#F6F4EF', borderRadius:'26px 26px 0 0', zIndex:21, padding:'16px 22px 26px', maxHeight:'92%', overflowY:'auto' }}>
+            <div onClick={closeSheet} style={{ position:'fixed', inset:0, background:'rgba(20,18,14,0.4)', zIndex:20 }}></div>
+            <div className="app-scroll" style={{ position:'fixed', left:0, right:0, bottom:0, background:'#F6F4EF', borderRadius:'26px 26px 0 0', zIndex:21, padding:'16px 22px calc(env(safe-area-inset-bottom) + 26px)', maxHeight:'92%', overflowY:'auto' }}>
               <div style={{ width:40, height:4, borderRadius:2, background:'#d8d2c5', margin:'0 auto 16px' }}></div>
               <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
                 <span style={{ fontSize:18, fontWeight:700, color:'#22201c' }}>할부 추가</span>
@@ -1163,8 +1155,8 @@ function App() {
         {/* ============ SETTINGS SHEET ============ */}
         {sheet === 'settings' && (
           <>
-            <div onClick={closeSheet} style={{ position:'absolute', inset:0, background:'rgba(20,18,14,0.4)', zIndex:20 }}></div>
-            <div className="app-scroll" style={{ position:'absolute', left:0, right:0, bottom:0, background:'#F6F4EF', borderRadius:'26px 26px 0 0', zIndex:21, padding:'16px 22px 26px', maxHeight:'88%', overflowY:'auto' }}>
+            <div onClick={closeSheet} style={{ position:'fixed', inset:0, background:'rgba(20,18,14,0.4)', zIndex:20 }}></div>
+            <div className="app-scroll" style={{ position:'fixed', left:0, right:0, bottom:0, background:'#F6F4EF', borderRadius:'26px 26px 0 0', zIndex:21, padding:'16px 22px calc(env(safe-area-inset-bottom) + 26px)', maxHeight:'88%', overflowY:'auto' }}>
               <div style={{ width:40, height:4, borderRadius:2, background:'#d8d2c5', margin:'0 auto 16px' }}></div>
               <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
                 <span style={{ fontSize:18, fontWeight:700, color:'#22201c' }}>설정</span>
@@ -1345,8 +1337,8 @@ function App() {
         {/* ============ RESTORE SHEET ============ */}
         {sheet === 'restore' && (
           <>
-            <div onClick={closeSheet} style={{ position:'absolute', inset:0, background:'rgba(20,18,14,0.4)', zIndex:20 }}></div>
-            <div style={{ position:'absolute', left:0, right:0, bottom:0, background:'#F6F4EF', borderRadius:'26px 26px 0 0', zIndex:21, padding:'16px 22px 26px', display:'flex', flexDirection:'column', maxHeight:'88%' }}>
+            <div onClick={closeSheet} style={{ position:'fixed', inset:0, background:'rgba(20,18,14,0.4)', zIndex:20 }}></div>
+            <div style={{ position:'fixed', left:0, right:0, bottom:0, background:'#F6F4EF', borderRadius:'26px 26px 0 0', zIndex:21, padding:'16px 22px calc(env(safe-area-inset-bottom) + 26px)', display:'flex', flexDirection:'column', maxHeight:'88%' }}>
               <div style={{ width:40, height:4, borderRadius:2, background:'#d8d2c5', margin:'0 auto 16px', flex:'none' }}></div>
               <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14, flex:'none' }}>
                 <span style={{ fontSize:18, fontWeight:700, color:'#22201c' }}>텍스트로 복원</span>
@@ -1368,7 +1360,6 @@ function App() {
           </>
         )}
 
-      </div>
     </div>
   );
 }
