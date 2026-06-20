@@ -55,7 +55,7 @@
 
 <script type="text/babel" data-presets="react">
 const { useState, useRef, useEffect } = React;
-const APP_BUILD = 'v2026-06-20-statslabel';
+const APP_BUILD = 'v2026-06-20-singlebudget';
 
 // ───────── inline initial data (mirrors initial_data.json) ─────────
 const INITIAL_DATA = {
@@ -291,7 +291,7 @@ function Hero({ hero, onSettings }) {
             <Donut pct={hero.dPct2} label={hero.dLabel2} color={hero.dColor2 || '#C9817A'} size={74}/>
           </div>
         ) : (
-          <Donut pct={hero.dPct} label={hero.dLabel} color="#D9B36A" size={96}/>
+          <Donut pct={hero.dPct} label={hero.dLabel} color={hero.dColor || '#D9B36A'} size={96}/>
         )}
       </div>
     </div>
@@ -816,8 +816,7 @@ function App() {
     hero = { context:`Jenny · ${yy}.${pad2(mm)}`, kicker:'이번 달 순지출', number: fmt(monthNet),
       subPre:'예산 ', subAccent: fmt(Math.abs(remaining)) + '원', subPost: over ? ' 초과' : ' 남음',
       subAccentColor: over ? '#C9817A' : '#A8C4A6',
-      dPct: achievePct, dLabel:'무지출 달성률', dColor:'#D9B36A',
-      dPct2: budgetPctReal, dLabel2:'예산 사용률', dColor2:'#C9817A' };
+      dPct: budgetPctReal, dLabel:'예산 사용률', dColor:'#C9817A' };
   }
 
   // input sheet styles
