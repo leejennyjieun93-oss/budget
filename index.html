@@ -6,7 +6,21 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#233A2E">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>무지출 가계부</title>
+<script>
+  // Unregister any leftover service workers from a previous deployment that
+  // could be serving the old cached HTML.
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.unregister()));
+  }
+  // Clear any HTTP/asset caches that were populated by an older SW.
+  if (typeof caches !== 'undefined' && caches.keys) {
+    caches.keys().then(keys => keys.forEach(k => caches.delete(k)));
+  }
+</script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
 <style>
   * { box-sizing: border-box; }
@@ -41,6 +55,7 @@
 
 <script type="text/babel" data-presets="react">
 const { useState, useRef, useEffect } = React;
+const APP_BUILD = 'v2026-06-20-accordion';
 
 // ───────── inline initial data (mirrors initial_data.json) ─────────
 const INITIAL_DATA = {
@@ -1364,6 +1379,10 @@ function App() {
                 ))}
               </div>
               <div style={{ fontSize:11.5, color:'#a39d92', lineHeight:1.5, padding:'0 4px' }}>브라우저 데이터를 지우면 기록이 사라지니 가끔 내보내기로 백업해두세요. Supabase 연결되면 자동 동기화됩니다.</div>
+              <div style={{ marginTop:18, paddingTop:14, borderTop:'1px solid #EFEBE1', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                <span style={{ fontSize:11, color:'#b3ada2' }}>build</span>
+                <span style={{ fontSize:11, color:'#8a857c', fontFamily:'ui-monospace, monospace', fontWeight:600 }}>{APP_BUILD}</span>
+              </div>
             </div>
           </>
         )}
