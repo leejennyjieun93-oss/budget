@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#233A2E">
@@ -55,7 +55,7 @@
 
 <script type="text/babel" data-presets="react">
 const { useState, useRef, useEffect } = React;
-const APP_BUILD = 'v2026-06-20-accordion';
+const APP_BUILD = 'v2026-06-20-kbfix';
 
 // ───────── inline initial data (mirrors initial_data.json) ─────────
 const INITIAL_DATA = {
@@ -475,6 +475,8 @@ function App() {
   const [memoDraft, setMemoDraft] = useState('');
   const [expandedDates, setExpandedDates] = useState([]);
   const [allLimit, setAllLimit] = useState(30);
+  const [memoFocused, setMemoFocused] = useState(false);
+  const [splitFocused, setSplitFocused] = useState(false);
   const [instMode, setInstMode] = useState('zero');
   // refs
   const memoRef       = useRef(null);
@@ -489,6 +491,7 @@ function App() {
     setAmount(''); setSplitTotal('');
     setDumb(false); setSplit(false);
     setMemoDraft(''); setEditingId(null); setEditDate(null);
+    setMemoFocused(false); setSplitFocused(false);
   };
   const closeSheet = () => {
     if (sheet === 'input' && editingFromAll) {
@@ -805,6 +808,7 @@ function App() {
   const keys = keyList.map(label => ({ label, on: () => pushKey(label), bg: label==='⌫' ? 'transparent' : '#fff' }));
   const amountDisplay = amount === '' ? '0' : fmt(Number(amount));
   const isIncome = seg === 'income';
+  const iosKbUp = memoFocused || splitFocused;
 
   return (
     <div className="app">
@@ -1117,8 +1121,11 @@ function App() {
                         <span style={{ fontSize:13, color:'#6b675f' }}>전체 결제액</span>
                         <input
                           inputMode="numeric"
+                          enterKeyHint="done"
                           value={splitTotal}
                           onChange={e => setSplitTotal(e.target.value.replace(/[^0-9]/g,''))}
+                          onFocus={() => setSplitFocused(true)}
+                          onBlur={() => setSplitFocused(false)}
                           placeholder="0"
                           style={{ width:140, textAlign:'right', border:'1px solid #E6E1D6', background:'#fff', borderRadius:10, padding:'9px 12px', fontSize:14, color:'#22201c', outline:'none' }}
                         />
@@ -1132,16 +1139,24 @@ function App() {
                   ref={memoRef}
                   defaultValue={memoDraft}
                   placeholder="메모 (선택)"
+                  inputMode="text"
+                  enterKeyHint="done"
+                  autoCapitalize="off"
+                  autoCorrect="off"
+                  onFocus={() => setMemoFocused(true)}
+                  onBlur={() => setMemoFocused(false)}
                   style={{ width:'100%', border:'none', background:'#fff', borderRadius:14, padding:'15px 16px', fontSize:14, color:'#22201c', marginBottom:16, outline:'none' }}
                 />
               </div>
 
-              <div style={{ flex:'none', padding:'6px 16px 0', background:'#EDE8DD' }}>
-                <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:6, padding:'10px 0' }}>
-                  {keys.map((k, i) => (
-                    <div key={i} onClick={k.on} style={{ cursor:'pointer', textAlign:'center', padding:'15px 0', borderRadius:12, background:k.bg, fontSize:21, fontWeight:700, color:'#22201c' }}>{k.label}</div>
-                  ))}
-                </div>
+              <div style={{ flex:'none', padding: iosKbUp ? '0 16px' : '6px 16px 0', background:'#EDE8DD' }}>
+                {!iosKbUp && (
+                  <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:6, padding:'10px 0' }}>
+                    {keys.map((k, i) => (
+                      <div key={i} onClick={k.on} style={{ cursor:'pointer', textAlign:'center', padding:'15px 0', borderRadius:12, background:k.bg, fontSize:21, fontWeight:700, color:'#22201c' }}>{k.label}</div>
+                    ))}
+                  </div>
+                )}
                 {editingId ? (
                   <div style={{ display:'flex', gap:8, marginBottom:'calc(env(safe-area-inset-bottom) + 18px)' }}>
                     <div onClick={onDelete} style={{ cursor:'pointer', flex:'0 0 38%', background:'#fff', color:'#C9817A', textAlign:'center', padding:16, borderRadius:15, fontSize:16, fontWeight:700, border:'1px solid #E6E1D6' }}>삭제</div>
