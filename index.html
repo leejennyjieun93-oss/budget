@@ -456,6 +456,7 @@ function App() {
   const [split, setSplit] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [editDate, setEditDate] = useState(null);
+  const [editingFromAll, setEditingFromAll] = useState(false);
   const [memoDraft, setMemoDraft] = useState('');
   const [instMode, setInstMode] = useState('zero');
   // refs
@@ -472,8 +473,18 @@ function App() {
     setDumb(false); setSplit(false);
     setMemoDraft(''); setEditingId(null); setEditDate(null);
   };
-  const closeSheet = () => { setSheet(null); resetInput(); };
-  const goTab = (t) => { setTab(t); closeSheet(); };
+  const closeSheet = () => {
+    if (sheet === 'input' && editingFromAll) {
+      setSheet('allrecords');
+      setEditingFromAll(false);
+      resetInput();
+    } else {
+      setSheet(null);
+      setEditingFromAll(false);
+      resetInput();
+    }
+  };
+  const goTab = (t) => { setTab(t); setSheet(null); setEditingFromAll(false); resetInput(); };
 
   const switchSeg = (next) => {
     setSeg(next);
@@ -490,7 +501,7 @@ function App() {
     });
   };
 
-  const openEdit = (id) => {
+  const openEdit = (id, fromAll = false) => {
     const r = records.find(x => x.id === id);
     if (!r) return;
     setEditingId(r.id);
@@ -503,6 +514,7 @@ function App() {
     setSplit(isSplit);
     setSplitTotal(isSplit ? String(r.paid) : '');
     setMemoDraft(r.memo || '');
+    setEditingFromAll(fromAll);
     setSheet('input');
   };
 
@@ -523,7 +535,15 @@ function App() {
       setRecords([saved, ...records]);
     }
     cloudUpsertRecord(saved);
-    closeSheet(); setTab('record');
+    if (editingFromAll) {
+      setSheet('allrecords');
+      setEditingFromAll(false);
+      resetInput();
+    } else {
+      setSheet(null);
+      resetInput();
+      setTab('record');
+    }
   };
 
   const onDelete = () => {
@@ -531,7 +551,14 @@ function App() {
     const id = editingId;
     setRecords(records.filter(r => r.id !== id));
     cloudDeleteRecord(id);
-    closeSheet();
+    if (editingFromAll) {
+      setSheet('allrecords');
+      setEditingFromAll(false);
+      resetInput();
+    } else {
+      setSheet(null);
+      resetInput();
+    }
   };
 
   const onSaveInst = () => {
@@ -602,12 +629,17 @@ function App() {
   const BUDGET      = settings.budget_month || 1;
   const budgetPct   = Math.min(100, monthNet / BUDGET * 100);
 
-  // weekly: last 7 days
-  const weekAgo = (() => {
-    const d = new Date(TODAY); d.setDate(d.getDate() - 6);
-    return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
+  // weekly: this ISO week (Mon → Sun, current day inclusive)
+  const { weekStart, weekEnd } = (() => {
+    const d = new Date(TODAY);
+    const dow = d.getDay();                     // 0=Sun, 1=Mon, ..., 6=Sat
+    const back = dow === 0 ? 6 : dow - 1;       // days back to Monday
+    const ms = new Date(d); ms.setDate(d.getDate() - back);
+    const me = new Date(ms); me.setDate(ms.getDate() + 6);
+    const fmt = (x) => `${x.getFullYear()}-${pad2(x.getMonth()+1)}-${pad2(x.getDate())}`;
+    return { weekStart: fmt(ms), weekEnd: fmt(me) };
   })();
-  const weeklySpent = records.filter(r => r.type === 'spend' && r.date >= weekAgo && r.date <= TODAY).reduce((a,r) => a + r.amount, 0);
+  const weeklySpent = records.filter(r => r.type === 'spend' && r.date >= weekStart && r.date <= weekEnd).reduce((a,r) => a + r.amount, 0);
   const weeklyPct   = Math.min(100, weeklySpent / Math.max(1, settings.budget_week) * 100);
 
   // streak / no-spend up to today
@@ -832,8 +864,8 @@ function App() {
                     <span style={{ fontSize:15, fontWeight:700, color:r.amountColor, flex:'none' }}>{r.amountText}</span>
                   </div>
                 ))}
-                <div style={{ padding:'13px 16px', textAlign:'center' }}>
-                  <span style={{ fontSize:13, color:'#8a857c', fontWeight:600 }}>전체 기록 보기</span>
+                <div onClick={() => setSheet('allrecords')} style={{ cursor:'pointer', padding:'13px 16px', textAlign:'center' }}>
+                  <span style={{ fontSize:13, color:'#233A2E', fontWeight:600 }}>전체 기록 보기</span>
                 </div>
               </div>
             </div>
@@ -1359,6 +1391,78 @@ function App() {
             </div>
           </>
         )}
+
+        {/* ============ ALL RECORDS SHEET ============ */}
+        {sheet === 'allrecords' && (() => {
+          const sorted = records.slice().sort((a,b) => b.date.localeCompare(a.date));
+          const groups = [];
+          for (const r of sorted) {
+            const ym = (r.date || '').slice(0,7);
+            const last = groups[groups.length - 1];
+            if (!last || last.ym !== ym) groups.push({ ym, items: [r] });
+            else last.items.push(r);
+          }
+          const tagOf = (r) => {
+            if (r.dumb)                  return { tag:'멍청소비', tagBg:'#F3DEDA', tagColor:'#B5564C' };
+            if (r.paid != null)          return { tag:'N빵',     tagBg:'#E3E9E4', tagColor:'#3C5C4A' };
+            if (r.type === 'fixed')      return { tag:'고정비', tagBg:'#EDE8DD', tagColor:'#8a7d5a' };
+            if (r.type === 'income')     return { tag:'수입',   tagBg:'#E9EEE9', tagColor:'#2F6B4A' };
+            return null;
+          };
+          return (
+            <>
+              <div onClick={closeSheet} style={{ position:'fixed', inset:0, background:'rgba(20,18,14,0.4)', zIndex:20 }}></div>
+              <div style={{ position:'fixed', left:0, right:0, top:0, bottom:0, background:'#F6F4EF', zIndex:21, display:'flex', flexDirection:'column' }}>
+                <div style={{ flex:'none', padding:'max(20px, calc(env(safe-area-inset-top) + 16px)) 22px 14px', background:'#fff', borderBottom:'1px solid #EFEBE1', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                  <span style={{ fontSize:18, fontWeight:700, color:'#22201c' }}>전체 기록</span>
+                  <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+                    <span style={{ fontSize:12, color:'#a39d92' }}>{records.length}건</span>
+                    <span onClick={closeSheet} style={{ cursor:'pointer', fontSize:14, color:'#233A2E', fontWeight:700 }}>닫기</span>
+                  </div>
+                </div>
+                <div className="app-scroll" style={{ flex:1, overflowY:'auto', minHeight:0, paddingBottom:'calc(env(safe-area-inset-bottom) + 24px)' }}>
+                  {groups.length === 0 && (
+                    <div style={{ padding:'40px 22px', textAlign:'center', color:'#a39d92', fontSize:14 }}>기록이 아직 없어요.</div>
+                  )}
+                  {groups.map(g => {
+                    const [yy, mm] = g.ym.split('-');
+                    return (
+                      <div key={g.ym}>
+                        <div style={{ padding:'18px 22px 8px', fontSize:12, fontWeight:700, color:'#8a857c', letterSpacing:'0.04em' }}>
+                          {yy}년 {Number(mm)}월 · {g.items.length}건
+                        </div>
+                        <div style={{ background:'#fff', margin:'0 16px 4px', borderRadius:18, overflow:'hidden' }}>
+                          {g.items.map((r, i) => {
+                            const t = tagOf(r);
+                            const amountColor = r.type === 'income' ? '#2F6B4A' : '#22201c';
+                            const sign = r.type === 'income' ? '+' : '−';
+                            return (
+                              <div key={r.id} onClick={() => openEdit(r.id, true)} style={{ cursor:'pointer', display:'flex', alignItems:'center', gap:13, padding:'14px 16px', borderBottom: i < g.items.length-1 ? '1px solid #F1EDE3' : 'none' }}>
+                                <div style={{ width:40, height:40, borderRadius:11, background:'#F2EFE7', display:'flex', alignItems:'center', justifyContent:'center', flex:'none' }}>
+                                  <span style={{ fontSize:11, fontWeight:700, color:'#6b675f' }}>{Number(r.date.slice(-2))}일</span>
+                                </div>
+                                <div style={{ flex:1, minWidth:0 }}>
+                                  <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                                    <span style={{ fontSize:14, fontWeight:600, color:'#22201c' }}>{r.cat}</span>
+                                    {t && (
+                                      <span style={{ fontSize:10, fontWeight:700, padding:'2px 7px', borderRadius:6, background:t.tagBg, color:t.tagColor }}>{t.tag}</span>
+                                    )}
+                                  </div>
+                                  <div style={{ fontSize:12, color:'#a39d92', marginTop:2, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{r.memo}</div>
+                                </div>
+                                <span style={{ fontSize:15, fontWeight:700, color:amountColor, flex:'none' }}>{sign}{fmt(r.amount)}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          );
+        })()}
 
     </div>
   );
