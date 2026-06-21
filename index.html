@@ -55,7 +55,7 @@
 
 <script type="text/babel" data-presets="react">
 const { useState, useRef, useEffect } = React;
-const APP_BUILD = 'v2026-06-20-instedit';
+const APP_BUILD = 'v2026-06-21-lspersist';
 
 // ───────── inline initial data (mirrors initial_data.json) ─────────
 const INITIAL_DATA = {
@@ -136,6 +136,27 @@ const fmtK  = (n) => {
   if (!n || n <= 0) return '';
   if (n >= 10000) return Math.round(n / 10000) + 'k';
   return Math.round(n / 1000) + '천';
+};
+
+// ───────── localStorage backup layer ─────────
+// Cloud은 로그인된 경우만 동작. 비로그인/오프라인일 때도 새 기록이 살아남도록
+// 모든 변경을 localStorage에 미러링하고 부팅 시 우선 복구.
+const LS_KEY = 'budget_app_state_v1';
+const readLS = () => {
+  try {
+    const raw = window.localStorage?.getItem(LS_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) {
+    console.warn('[ls] read failed', e);
+    return null;
+  }
+};
+const writeLS = (data) => {
+  try {
+    window.localStorage?.setItem(LS_KEY, JSON.stringify(data));
+  } catch (e) {
+    console.error('[ls] write failed', e);
+  }
 };
 const todayISO = () => {
   const d = new Date();
@@ -331,6 +352,7 @@ function App() {
   const [installments, setInstallments] = useState([]);
   const [settings, setSettings] = useState(INITIAL_SETTINGS);
   const [authState, setAuthState] = useState(supa ? 'connecting' : 'offline'); // connecting|unauthenticated|connected|empty|offline
+  const [appReady, setAppReady] = useState(false);
   const [uid, setUid] = useState(null);
   const [loginEmail, setLoginEmail] = useState('');
   const [userEmail, setUserEmail] = useState(null);
@@ -363,11 +385,20 @@ function App() {
 
   // Session check on boot — NEVER auto-login.
   useEffect(() => {
-    if (!supa) {
+    // 1) localStorage에서 먼저 즉시 복구 (비로그인 상태에서도 새 기록이 살아있도록)
+    const ls = readLS();
+    const lsHasData = ls && (Array.isArray(ls.records) && ls.records.length > 0);
+    if (lsHasData) {
+      console.log('[ls] hydrated', ls.records.length, 'records');
+      setRecords(ls.records);
+      if (Array.isArray(ls.installments)) setInstallments(ls.installments);
+      if (ls.settings) setSettings(ls.settings);
+    } else {
       setRecords(INITIAL_RECORDS);
       setInstallments(INITIAL_INSTALLMENTS);
-      return;
     }
+
+    if (!supa) { setAppReady(true); return; }
     let cancelled = false;
     (async () => {
       try {
@@ -377,24 +408,26 @@ function App() {
         if (user) {
           setUid(user.id);
           setUserEmail(user.email || null);
-          await fetchCloud(user.id);
+          await fetchCloud(user.id);  // cloud 데이터가 있으면 LS 위에 덮어쓰기
         } else {
-          // No session — show local fallback, prompt login via settings.
-          setRecords(INITIAL_RECORDS);
-          setInstallments(INITIAL_INSTALLMENTS);
           setAuthState('unauthenticated');
         }
       } catch (e) {
         console.error('[cloud] init failed:', e);
-        if (!cancelled) {
-          setRecords(INITIAL_RECORDS);
-          setInstallments(INITIAL_INSTALLMENTS);
-          setAuthState('offline');
-        }
+        if (!cancelled) setAuthState('offline');
+      } finally {
+        if (!cancelled) setAppReady(true);
       }
     })();
     return () => { cancelled = true; };
   }, []);
+
+  // 영속화: appReady 이후 records/installments/settings 바뀔 때마다 LS에 미러.
+  // cloud 로그인 여부와 무관하게 동작 — cloud는 별도로 upsert가 이미 호출됨.
+  useEffect(() => {
+    if (!appReady) return;
+    writeLS({ records, installments, settings, savedAt: new Date().toISOString() });
+  }, [appReady, records, installments, settings]);
 
   const doLogin = async () => {
     if (!supa) return;
@@ -586,6 +619,7 @@ function App() {
         date: todayISO(), dumb: seg === 'spend' && dumb };
       setRecords([saved, ...records]);
     }
+    console.log('[save] record:', saved, '| authState:', authState, '| uid:', uid);
     cloudUpsertRecord(saved);
     if (editingFromAll) {
       setSheet('allrecords');
