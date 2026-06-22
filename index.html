@@ -55,7 +55,7 @@
 
 <script type="text/babel" data-presets="react">
 const { useState, useRef, useEffect } = React;
-const APP_BUILD = 'v2026-06-21-lspersist';
+const APP_BUILD = 'v2026-06-22-cat-date-fix';
 
 // ───────── inline initial data (mirrors initial_data.json) ─────────
 const INITIAL_DATA = {
@@ -177,7 +177,7 @@ const uuid = () => (window.crypto?.randomUUID
     }));
 
 const CATEGORIES = {
-  spend:  ['식비','카페/간식','교통','쇼핑','의료','운동','뷰티','구독료','기타'],
+  spend:  ['식비','카페/간식','교통','쇼핑','의료','운동','뷰티','여가/문화','기타'],
   fixed:  ['통신비','구독','보험','대출이자','월세/관리비','기타고정'],
   income: ['실비환급','기타수입','급여'],
 };
@@ -532,11 +532,12 @@ function App() {
   const [dumb, setDumb] = useState(false);
   const [split, setSplit] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [editDate, setEditDate] = useState(null);
+  const [inputDate, setInputDate] = useState(todayISO());
   const [editingFromAll, setEditingFromAll] = useState(false);
   const [memoDraft, setMemoDraft] = useState('');
   const [expandedDates, setExpandedDates] = useState([]);
   const [allLimit, setAllLimit] = useState(30);
+  const [expandedFixed, setExpandedFixed] = useState([]);
   const [memoFocused, setMemoFocused] = useState(false);
   const [splitFocused, setSplitFocused] = useState(false);
   const [editingInstId, setEditingInstId] = useState(null);
@@ -554,7 +555,8 @@ function App() {
   const resetInput = () => {
     setAmount(''); setSplitTotal('');
     setDumb(false); setSplit(false);
-    setMemoDraft(''); setEditingId(null); setEditDate(null);
+    setMemoDraft(''); setEditingId(null);
+    setInputDate(todayISO());
     setMemoFocused(false); setSplitFocused(false);
     setEditingInstId(null); setEditInstDraft(null);
   };
@@ -590,7 +592,7 @@ function App() {
     const r = records.find(x => x.id === id);
     if (!r) return;
     setEditingId(r.id);
-    setEditDate(r.date);
+    setInputDate(r.date || todayISO());
     setSeg(r.type);
     setCat(r.cat);
     setAmount(String(r.amount));
@@ -612,11 +614,11 @@ function App() {
     if (editingId) {
       saved = { ...(records.find(r => r.id === editingId) || {}), id: editingId,
         type: seg, cat, memo, amount: amt, paid, dumb: seg==='spend' && dumb,
-        date: editDate || todayISO() };
+        date: inputDate || todayISO() };
       setRecords(records.map(r => r.id === editingId ? saved : r));
     } else {
       saved = { id: uuid(), type: seg, cat, memo, amount: amt, paid,
-        date: todayISO(), dumb: seg === 'spend' && dumb };
+        date: inputDate || todayISO(), dumb: seg === 'spend' && dumb };
       setRecords([saved, ...records]);
     }
     console.log('[save] record:', saved, '| authState:', authState, '| uid:', uid);
@@ -836,17 +838,23 @@ function App() {
   const maxCat = catArr.length ? catArr[0][1] : 1;
   const catBars = catArr.map(([name,v]) => ({ name, amountText: fmt(v), pct: (v/maxCat*100).toFixed(1)+'%' }));
 
-  // fixed bars
+  // fixed bars (with items for expansion)
   const byFix = {};
-  fix.forEach(r => { byFix[r.cat] = (byFix[r.cat]||0) + r.amount; });
-  const fixArr = Object.entries(byFix).sort((a,b) => b[1]-a[1]);
-  const totalFix = fixArr.reduce((a,[,v]) => a + v, 0);
-  const maxFix   = fixArr.length ? fixArr[0][1] : 1;
+  fix.forEach(r => {
+    if (!byFix[r.cat]) byFix[r.cat] = { total: 0, items: [] };
+    byFix[r.cat].total += r.amount;
+    byFix[r.cat].items.push(r);
+  });
+  const fixArr = Object.entries(byFix).sort((a,b) => b[1].total - a[1].total);
+  const totalFix = fixArr.reduce((a,[,v]) => a + v.total, 0);
+  const maxFix   = fixArr.length ? fixArr[0][1].total : 1;
   const fixedBars = fixArr.map(([name,v]) => ({
     name,
-    amountText: fmt(v),
-    pct:        (v/maxFix*100).toFixed(1)+'%',
-    shareText:  totalFix ? Math.round(v/totalFix*100)+'%' : '0%',
+    total:      v.total,
+    items:      v.items.slice().sort((a,b) => (b.date || '').localeCompare(a.date || '')),
+    amountText: fmt(v.total),
+    pct:        (v.total/maxFix*100).toFixed(1)+'%',
+    shareText:  totalFix ? Math.round(v.total/totalFix*100)+'%' : '0%',
   }));
 
   // trend — 6 months
@@ -1122,18 +1130,41 @@ function App() {
               {/* fixed */}
               <div style={{ background:'#fff', borderRadius:18, padding:18, marginBottom:16 }}>
                 <div style={{ fontSize:15, fontWeight:700, color:'#22201c', marginBottom:6 }}>고정비 카테고리별</div>
-                <div style={{ fontSize:11.5, color:'#a39d92', marginBottom:14 }}>고정비는 예산·무지출 계산에서 제외돼요.</div>
-                {fixedBars.map((f, i) => (
-                  <div key={i} style={{ marginBottom:13 }}>
-                    <div style={{ display:'flex', justifyContent:'space-between', marginBottom:6 }}>
-                      <span style={{ fontSize:13, color:'#22201c', fontWeight:600 }}>{f.name}</span>
-                      <span style={{ fontSize:12.5, color:'#8a857c' }}>{f.amountText}원 · {f.shareText}</span>
+                <div style={{ fontSize:11.5, color:'#a39d92', marginBottom:14 }}>고정비는 예산·무지출 계산에서 제외돼요. 카테고리를 탭하면 개별 항목이 펼쳐져요.</div>
+                {fixedBars.map((f, i) => {
+                  const expanded = expandedFixed.includes(f.name);
+                  return (
+                    <div key={i} style={{ marginBottom:13 }}>
+                      <div onClick={() => setExpandedFixed(prev => prev.includes(f.name) ? prev.filter(x => x !== f.name) : [...prev, f.name])} style={{ cursor:'pointer', display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
+                        <span style={{ fontSize:13, color:'#22201c', fontWeight:600, display:'flex', alignItems:'center', gap:6 }}>
+                          <span style={{ display:'inline-block', width:10, fontSize:11, color:'#a39d92', transform: expanded ? 'rotate(90deg)' : 'rotate(0)', transition:'transform .15s' }}>▸</span>
+                          {f.name}
+                          <span style={{ fontSize:11, color:'#a39d92', fontWeight:500 }}>· {f.items.length}건</span>
+                        </span>
+                        <span style={{ fontSize:12.5, color:'#8a857c' }}>{f.amountText}원 · {f.shareText}</span>
+                      </div>
+                      <div style={{ height:7, borderRadius:5, background:'#EFEBE1', overflow:'hidden' }}>
+                        <div style={{ width:f.pct, height:'100%', background:'#3C5C4A', borderRadius:5 }}></div>
+                      </div>
+                      {expanded && (
+                        <div style={{ marginTop:10, paddingLeft:14, borderLeft:'2px solid #EFEBE1' }}>
+                          {f.items.map((r, j) => {
+                            const day = r.date ? Number(r.date.slice(-2)) + '일' : '';
+                            return (
+                              <div key={r.id || j} style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', padding:'7px 0', borderTop: j > 0 ? '1px solid #F5F1E6' : 'none' }}>
+                                <div style={{ flex:1, minWidth:0, paddingRight:10 }}>
+                                  <div style={{ fontSize:12.5, color:'#22201c', fontWeight:500, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{r.memo || r.cat}</div>
+                                  {day && <div style={{ fontSize:11, color:'#a39d92', marginTop:1 }}>{day}</div>}
+                                </div>
+                                <span style={{ fontSize:13, color:'#22201c', fontWeight:700, whiteSpace:'nowrap' }}>−{fmt(r.amount)}원</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
-                    <div style={{ height:7, borderRadius:5, background:'#EFEBE1', overflow:'hidden' }}>
-                      <div style={{ width:f.pct, height:'100%', background:'#3C5C4A', borderRadius:5 }}></div>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               {/* trend */}
@@ -1187,6 +1218,16 @@ function App() {
               </div>
 
               <div className="app-scroll" style={{ overflowY:'auto', minHeight:0, padding:'0 22px' }}>
+                <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:10, padding:'4px 0 12px' }}>
+                  <span style={{ fontSize:12, color:'#8a857c', fontWeight:600 }}>날짜</span>
+                  <input
+                    type="date"
+                    value={inputDate}
+                    onChange={e => setInputDate(e.target.value || todayISO())}
+                    max={todayISO()}
+                    style={{ border:'1px solid #E6E1D6', background:'#fff', borderRadius:10, padding:'7px 12px', fontSize:13.5, color:'#22201c', fontWeight:600, outline:'none' }}
+                  />
+                </div>
                 <div style={{ textAlign:'center', padding:'6px 0 18px' }}>
                   <div style={{ display:'flex', alignItems:'baseline', justifyContent:'center', gap:5 }}>
                     {isIncome && <span style={{ fontSize:30, fontWeight:700, color:'#2F6B4A' }}>+</span>}
