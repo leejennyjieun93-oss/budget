@@ -55,7 +55,7 @@
 
 <script type="text/babel" data-presets="react">
 const { useState, useRef, useEffect } = React;
-const APP_BUILD = 'v2026-06-22-cat-date-fix';
+const APP_BUILD = 'v2026-06-22-fixed-total';
 
 // ───────── inline initial data (mirrors initial_data.json) ─────────
 const INITIAL_DATA = {
@@ -1131,6 +1131,13 @@ function App() {
               <div style={{ background:'#fff', borderRadius:18, padding:18, marginBottom:16 }}>
                 <div style={{ fontSize:15, fontWeight:700, color:'#22201c', marginBottom:6 }}>고정비 카테고리별</div>
                 <div style={{ fontSize:11.5, color:'#a39d92', marginBottom:14 }}>고정비는 예산·무지출 계산에서 제외돼요. 카테고리를 탭하면 개별 항목이 펼쳐져요.</div>
+                <div style={{ padding:'2px 0 18px', borderBottom:'1px solid #F1EDE3', marginBottom:16 }}>
+                  <div style={{ fontSize:12, color:'#8a857c', fontWeight:600, marginBottom:4 }}>이번 달 고정비 합계</div>
+                  <div style={{ display:'flex', alignItems:'baseline', gap:5 }}>
+                    <span style={{ fontSize:28, fontWeight:800, color:'#3C5C4A', letterSpacing:'-0.01em' }}>{fmt(totalFix)}</span>
+                    <span style={{ fontSize:15, color:'#8a857c', fontWeight:600 }}>원</span>
+                  </div>
+                </div>
                 {fixedBars.map((f, i) => {
                   const expanded = expandedFixed.includes(f.name);
                   return (
