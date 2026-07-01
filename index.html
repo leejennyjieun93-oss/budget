@@ -55,7 +55,7 @@
 
 <script type="text/babel" data-presets="react">
 const { useState, useRef, useEffect } = React;
-const APP_BUILD = 'v2026-06-22-fixed-total';
+const APP_BUILD = 'v2026-07-01-statsmonth';
 
 // ───────── inline initial data (mirrors initial_data.json) ─────────
 const INITIAL_DATA = {
@@ -429,6 +429,19 @@ function App() {
     writeLS({ records, installments, settings, savedAt: new Date().toISOString() });
   }, [appReady, records, installments, settings]);
 
+  // 통계 탭 초기 월: 현재 달에 기록 없으면 최신 기록이 있는 달로 자동 이동
+  useEffect(() => {
+    if (statsInitedRef.current) return;
+    if (!records.length) return;
+    const cm = currentMonthISO();
+    const hasCurrent = records.some(r => r.date && r.date.startsWith(cm));
+    if (!hasCurrent) {
+      const latest = records.reduce((m, r) => (r.date && r.date > m) ? r.date : m, '');
+      if (latest) setStatsMonth(latest.slice(0,7));
+    }
+    statsInitedRef.current = true;
+  }, [records.length]);
+
   const doLogin = async () => {
     if (!supa) return;
     if (!loginEmail || !authPassword) { setAuthError('이메일과 비밀번호를 입력해주세요'); return; }
@@ -538,6 +551,8 @@ function App() {
   const [expandedDates, setExpandedDates] = useState([]);
   const [allLimit, setAllLimit] = useState(30);
   const [expandedFixed, setExpandedFixed] = useState([]);
+  const [statsMonth, setStatsMonth] = useState(() => currentMonthISO());
+  const statsInitedRef = useRef(false);
   const [memoFocused, setMemoFocused] = useState(false);
   const [splitFocused, setSplitFocused] = useState(false);
   const [editingInstId, setEditingInstId] = useState(null);
@@ -739,10 +754,12 @@ function App() {
   // ───────── derivations ─────────
   const TODAY = todayISO();
   const CM    = currentMonthISO();
-  const [yy, mm] = CM.split('-').map(Number);
+  const activeMonth = tab === 'stats' ? statsMonth : CM;
+  const [yy, mm] = activeMonth.split('-').map(Number);
+  const monthDayCount = new Date(yy, mm, 0).getDate();
   const challengeStart = settings.challenge_start || `${CM}-01`;
 
-  const monthRecords = records.filter(r => r.date && r.date.startsWith(CM));
+  const monthRecords = records.filter(r => r.date && r.date.startsWith(activeMonth));
   const exp = monthRecords.filter(r => r.type === 'spend');
   const inc = monthRecords.filter(r => r.type === 'income');
   const fix = monthRecords.filter(r => r.type === 'fixed');
@@ -766,10 +783,16 @@ function App() {
   const weeklyPct   = Math.min(100, weeklySpent / Math.max(1, settings.budget_week) * 100);
 
   // streak / no-spend up to today
+  // 활성월 범위로 스코프 좁혀서 무지출/달성률 계산
+  const monthStartISO = `${activeMonth}-01`;
+  const monthEndISO = `${activeMonth}-${pad2(monthDayCount)}`;
+  const scopeStart = monthStartISO > challengeStart ? monthStartISO : challengeStart;
+  const scopeEnd = monthEndISO < TODAY ? monthEndISO : TODAY;
   const noSpendCount = (() => {
+    if (scopeStart > scopeEnd) return 0;
     let n = 0;
-    const start = new Date(challengeStart);
-    const end = new Date(TODAY);
+    const start = new Date(scopeStart);
+    const end = new Date(scopeEnd);
     for (let cursor = new Date(start); cursor <= end; cursor.setDate(cursor.getDate() + 1)) {
       const ds = `${cursor.getFullYear()}-${pad2(cursor.getMonth()+1)}-${pad2(cursor.getDate())}`;
       if (!records.some(r => r.date === ds && r.type === 'spend')) n++;
@@ -788,7 +811,7 @@ function App() {
     }
     return n;
   })();
-  const daysElapsed = Math.max(1, Math.floor((new Date(TODAY) - new Date(challengeStart)) / 86400000) + 1);
+  const daysElapsed = scopeStart > scopeEnd ? 1 : Math.max(1, Math.floor((new Date(scopeEnd) - new Date(scopeStart)) / 86400000) + 1);
   const achievePct = Math.max(0, Math.min(100, Math.round(noSpendCount / daysElapsed * 100)));
 
   // records list — current month, sort by date desc, top 10
@@ -810,12 +833,11 @@ function App() {
   });
 
   // calendar
-  const monthDayCount = new Date(yy, mm, 0).getDate();
   const startDow = new Date(yy, mm - 1, 1).getDay();
   const calendar = [];
   for (let i=0;i<startDow;i++) calendar.push({ label:'', bg:'transparent', color:'transparent', weight:'400' });
   for (let d=1; d<=monthDayCount; d++) {
-    const ds = `${CM}-${pad2(d)}`;
+    const ds = `${activeMonth}-${pad2(d)}`;
     let bg='#F2EFE7', color='#b3ada2', weight='500';
     const hasSpend = records.some(r => r.date === ds && r.type === 'spend');
     if (ds === TODAY)                  { bg='#D9B36A'; color='#3a2e10'; weight='800'; }
@@ -897,7 +919,8 @@ function App() {
       subPre:'남은 할부 잔액 ', subAccent: fmt(instRemain)+'원', subPost:'',
       dPct: instProgressPct, dLabel:'상환율' };
   } else if (tab === 'stats') {
-    hero = { context:`통계 · ${yy}.${pad2(mm)}`, kicker:'이번 달 순지출', number: fmt(monthNet),
+    const sKicker = activeMonth === CM ? '이번 달 순지출' : `${mm}월 순지출`;
+    hero = { context:`통계 · ${yy}.${pad2(mm)}`, kicker: sKicker, number: fmt(monthNet),
       subPre:'총지출 ', subAccent: fmt(totalSpend)+'원', subPost:' · 수입 +'+fmt(totalIncome),
       dPct: achievePct, dLabel:'무지출 달성률' };
   } else {
@@ -1041,7 +1064,23 @@ function App() {
         {tab === 'stats' && (
           <div className="app-scroll" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 80px)' }}>
             <Hero hero={hero} onSettings={() => setSheet('settings')} />
-            <div style={{ padding:'22px 22px 0' }}>
+            <div style={{ padding:'18px 22px 0' }}>
+              {/* month navigator */}
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, marginBottom:16 }}>
+                <div onClick={() => {
+                  const d = new Date(yy, mm - 2, 1);
+                  setStatsMonth(`${d.getFullYear()}-${pad2(d.getMonth()+1)}`);
+                }} style={{ cursor:'pointer', width:36, height:36, borderRadius:10, background:'#fff', display:'flex', alignItems:'center', justifyContent:'center', color:'#22201c', fontSize:18, fontWeight:700 }}>‹</div>
+                <div style={{ background:'#fff', padding:'8px 18px', borderRadius:10, fontSize:14, fontWeight:700, color:'#22201c', minWidth:130, textAlign:'center', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+                  <span>{yy}년 {mm}월</span>
+                  {activeMonth === CM && <span style={{ fontSize:11, color:'#8a857c', fontWeight:500 }}>(이번 달)</span>}
+                </div>
+                <div onClick={() => {
+                  if (activeMonth >= CM) return;
+                  const d = new Date(yy, mm, 1);
+                  setStatsMonth(`${d.getFullYear()}-${pad2(d.getMonth()+1)}`);
+                }} style={{ cursor: activeMonth >= CM ? 'not-allowed' : 'pointer', width:36, height:36, borderRadius:10, background: activeMonth >= CM ? '#F2EFE7' : '#fff', display:'flex', alignItems:'center', justifyContent:'center', color: activeMonth >= CM ? '#cfc9bc' : '#22201c', fontSize:18, fontWeight:700 }}>›</div>
+              </div>
               <div style={{ display:'flex', gap:12, marginBottom:16 }}>
                 <div style={{ flex:1, background:'#fff', borderRadius:16, padding:'15px 16px' }}>
                   <div style={{ fontSize:12, color:'#8a857c', marginBottom:6 }}>총지출</div>
